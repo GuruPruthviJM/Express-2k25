@@ -6,11 +6,30 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// GET Method
+const loggingMiddleware = (req, res, next) => {
+    console.log(`${req.method} - ${req.url}`);
+    next();
+};
 
-app.get('/', (req, res) => {
+const resolveIndexByUserId = (req, res, next) => {
+    const {params: {id}} = req; 
+    const parseId=parseInt(id, 10);
+    if(isNaN(parseId)){
+        return res.sendStatus(400)
+    }
+    const userIndex = mockUsers.findIndex(user => user.id === parseId);
+    if(userIndex === -1) return res.sendStatus(404);
+    req.userIndex = userIndex;
+    // req.id = parseId;
+    next();
+}
+
+// GET Method
+app.get('/', loggingMiddleware, (req, res) => {
     res.send("Hello, world!");    
 })
+
+
 
 let mockUsers = [
     {
@@ -34,10 +53,14 @@ app.listen(PORT, ()=>{
     console.log(`Server is running on port ${PORT}`);
 });
 
-app.get('/api/users', (req, res) => {
+app.get('/api/users',
+    // we can have multiple middlewares for same function
+     (req, res, next)=>{ // Middleware A
+        console.log("Base URL");
+        next();
+     },
+     (req, res) => { // Middleware B
     const {filter, value} = req.query;
-    console.log(value);
-    
     if(!filter||!value){
         return res.send(mockUsers)
     }
@@ -83,41 +106,25 @@ app.post('/api/users', (req, res) => {
 // Put
 // Here we are going to update the complete data of a particular object
 
-app.put('/api/users/:id', (req, res) => {
-    const {body, params: {id}} = req; 
-    const parseId=parseInt(id)
-    if(isNaN(parseId)){
-        return res.sendStatus(400)
-    }
-    const userIndex = mockUsers.findIndex(user => user.id === parseId);
-    if(userIndex === -1) return res.sendStatus(404);
-    mockUsers[userIndex] = {id:parseId,...body}
+app.put('/api/users/:id', resolveIndexByUserId, (req, res) => {
+    const {userIndex, params, body} = req.userIndex;
+    let id = parseInt(params.id); 
+    mockUsers[userIndex] = {id,...body}
     return res.status(200).send(mockUsers[userIndex])
 })
 
 // Patch
 
-app.patch('/api/users/:id', (req, res) => {
-    const {body, params: {id}} = req; 
-    const parseId=parseInt(id)
-    if(isNaN(parseId)){
-        return res.sendStatus(400)
-    }
-    const userIndex = mockUsers.findIndex(user => user.id === parseId);
-    if(userIndex === -1) return res.sendStatus(404);
-    mockUsers[userIndex] = {...mockUsers[userIndex],...body}
+app.patch('/api/users/:id', resolveIndexByUserId, (req, res) => {
+    let userIndex = req.userIndex
+    mockUsers[userIndex] = {...mockUsers[userIndex],...req.body}
     return res.status(200).send(mockUsers[userIndex])
 })
 
 // Delete
 
-app.delete('/api/users/:id', (req, res) => {
-    const parseId=parseInt(req.params.id)
-    if(isNaN(parseId)){
-        return res.sendStatus(400)
-    }
-    const userIndex = mockUsers.findIndex(user => user.id === parseId);
-    if(userIndex === -1) return res.sendStatus(404);
+app.delete('/api/users/:id', resolveIndexByUserId, (req, res) => {
+    let userIndex = req.userIndex
     mockUsers.splice(userIndex, 1);
     return res.sendStatus(204)
 })
