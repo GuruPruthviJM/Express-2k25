@@ -1,4 +1,5 @@
 import express from "express";
+import { body, query, validationResult } from "express-validator";
 
 const app = express();
 
@@ -26,9 +27,8 @@ const resolveIndexByUserId = (req, res, next) => {
 
 // GET Method
 app.get('/', loggingMiddleware, (req, res) => {
-    res.send("Hello, world!");    
+    res.send("Hello, world!");
 })
-
 
 
 let mockUsers = [
@@ -55,19 +55,21 @@ app.listen(PORT, ()=>{
 
 app.get('/api/users',
     // we can have multiple middlewares for same function
-     (req, res, next)=>{ // Middleware A
-        console.log("Base URL");
-        next();
-     },
-     (req, res) => { // Middleware B
-    const {filter, value} = req.query;
-    if(!filter||!value){
-        return res.send(mockUsers)
-    }
+    query('filter')
+    .isString().withMessage('fliter should be string')
+    .notEmpty().withMessage('Filter should be not empty')
+    .isLength({ min: 3, max: 10}).withMessage('Must be at least 3 characters'),
     
-    const filteredUsers = mockUsers.filter(user => user[filter].toLowerCase().includes(value.toLowerCase()));
-    if(!filteredUsers.length) return res.status(404).send("No users found")
-    return res.send(filteredUsers)
+     (req, res) => { // Middleware C
+        const result = validationResult(req)
+        console.log(result);
+        const {query: {filter, value}} = req
+        if(!filter||!value){
+            return res.send(mockUsers)
+        }
+        const filteredUsers = mockUsers.filter(user => user[filter].toLowerCase().includes(value.toLowerCase()));
+        if(!filteredUsers.length) return res.status(404).send("No users found")
+        return res.send(filteredUsers)  
 })
 
 app.get('/api/users/:id', (req, res) => {
@@ -90,7 +92,16 @@ app.get('/api/products', (req, res) => {
 
 //POST Method
 
-app.post('/api/users', (req, res) => {
+app.post('/api/users', 
+    
+    body('name')
+    .notEmpty().withMessage("Username should not be empty")
+    .isLength({min: 5, max: 30}).withMessage("Username should be minimum length of 5 and maximum length of 30")
+    .isString().withMessage("Username should be a string"),
+
+    (req, res) => {
+    const result = validationResult(req)
+    console.log(result);
     if (!req.body.name || !req.body.email) {
         return res.status(400).send({ message: "Name and email are required" });
     }
