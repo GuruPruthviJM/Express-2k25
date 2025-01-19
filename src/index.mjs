@@ -1,5 +1,6 @@
 import express from "express";
-import { body, query, validationResult } from "express-validator";
+import { body, checkSchema, matchedData, query, validationResult } from "express-validator";
+import { createUserValidationSchema } from "./utils/validationScemas.js";
 
 const app = express();
 
@@ -94,21 +95,20 @@ app.get('/api/products', (req, res) => {
 
 app.post('/api/users', 
     
-    body('name')
-    .notEmpty().withMessage("Username should not be empty")
-    .isLength({min: 5, max: 30}).withMessage("Username should be minimum length of 5 and maximum length of 30")
-    .isString().withMessage("Username should be a string"),
+    checkSchema(createUserValidationSchema),
 
     (req, res) => {
     const result = validationResult(req)
-    console.log(result);
-    if (!req.body.name || !req.body.email) {
-        return res.status(400).send({ message: "Name and email are required" });
+    if(!result.isEmpty()){
+        return res.status(400).json(result.array());
     }
+
+    const data = matchedData(req)
+    console.log(data);
+    
     const newUser = {
         id: mockUsers.length + 1,
-        name: req.body.name,
-        email: req.body.email
+        ...data
     }
     mockUsers.push(newUser);
     return res.status(200).send(mockUsers)
